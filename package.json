@@ -1,0 +1,49 @@
+{
+  "name": "@uselamina/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for Lamina — the agentic creative API for generating videos, movies, and images",
+  "keywords": [
+    "lamina",
+    "ai",
+    "sdk",
+    "image-generation",
+    "video-generation",
+    "content-creation",
+    "creative-engine",
+    "media",
+    "workflows",
+    "headless"
+  ],
+  "homepage": "https://docs.uselamina.ai",
+  "bugs": {
+    "url": "https://docs.uselamina.ai"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/uselamina/lamina-sdk.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "prepack": "npm run build",
+    "test": "npm run build && rm -rf dist-test && tsc -p tsconfig.test.json && node --test dist-test/__tests__/*.test.js"
+  }
+}
