@@ -18,12 +18,27 @@ export interface AppCapabilities {
   nodeTypes: string[];
 }
 
+export interface AppInputSummaryEntry {
+  name: string;
+  type: string;
+}
+
+export interface AppInputSummary {
+  required: AppInputSummaryEntry[];
+  optional: AppInputSummaryEntry[];
+  total: number;
+}
+
 export interface AppSummary {
   appId: string;
   name: string;
   description: string | null;
   isPublic: boolean;
   capabilities: AppCapabilities | null;
+  icon?: string | null;
+  modality?: string | null;
+  outputFormats?: string[];
+  inputSummary?: AppInputSummary;
 }
 
 export interface ParameterOption {
@@ -113,6 +128,13 @@ export interface QualityResult {
   attempts: number;
 }
 
+export interface ExecutionProgress {
+  totalOutputs: number;
+  completedOutputs: number;
+  failedOutputs: number;
+  percentComplete: number | null;
+}
+
 export interface ExecutionStatus {
   runId: string;
   workflowId: string;
@@ -123,6 +145,7 @@ export interface ExecutionStatus {
   completedAt: string | null;
   createdAt: string;
   quality?: QualityResult;
+  progress?: ExecutionProgress;
 }
 
 export interface WebhookSigningKeyResponse {
@@ -542,6 +565,9 @@ export interface LaminaCreateParams {
   appId?: string;
   inputs?: Record<string, unknown>;
   autoQuality?: AutoQualityConfig;
+  templateId?: string;
+  aspectRatio?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface LaminaCreateResult {
@@ -579,8 +605,68 @@ export interface ContentBriefParams {
   modality?: string;
   count?: number;
   brandProfileId?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ContentBriefResult {
   concepts: ContentConcept[];
+}
+
+// ─── Runs API: new endpoints ──────────────────────────────────────────────
+
+export interface ServerWaitOptions {
+  timeout?: number;
+}
+
+export interface ServerWaitEnvelope {
+  data: ExecutionStatus;
+  timeout?: boolean;
+}
+
+export interface FeedbackParams {
+  feedback: string;
+}
+
+export interface RefinedNode {
+  nodeId: string;
+  reason: string;
+}
+
+export interface FeedbackResult {
+  runId: string;
+  status: string;
+  summary: string;
+  refinedNodes: RefinedNode[];
+  outputs: ExecutionOutput[];
+  errorMessage: string | null;
+}
+
+export interface ListRunsParams {
+  status?: string;
+  appId?: string;
+  limit?: number;
+  offset?: number;
+  since?: string;
+}
+
+export interface RunSummary {
+  runId: string;
+  workflowId: string;
+  status: LaminaExecutionStatusState | string;
+  source: string;
+  errorMessage: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export interface Pagination {
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface ListRunsResult {
+  data: RunSummary[];
+  pagination: Pagination;
 }
