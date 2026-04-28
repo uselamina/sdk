@@ -8,17 +8,10 @@ export { createContentApi as createCompoundApi } from './content.js';
 export { createIntelligenceApi } from './intelligence.js';
 export { createPublishingApi } from './publishing.js';
 export { LaminaWebhookListener } from './webhookListener.js';
-export {
-  clearStoredWebhookConfig,
-  clearStoredCredentials,
-  getDefaultConfigDir,
-  getDefaultConfigPath,
-  readStoredConfig,
-  readStoredCredentials,
-  readStoredWebhookConfig,
-  writeStoredCredentials,
-  writeStoredWebhookConfig,
-} from './storage.js';
+// Storage helpers are CLI/server-only — they import `node:fs/promises`,
+// `node:os`, `node:path` which break browser bundlers. Removed from the
+// main browser-facing entry. CLI consumers should import them via the
+// dedicated subpath: `import { readStoredCredentials } from '@uselamina/sdk/storage'`.
 export {
   createWebhooksApi,
   extractWebhookHeaders,

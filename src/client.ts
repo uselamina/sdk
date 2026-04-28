@@ -6,7 +6,11 @@ import { createLaminaError } from './errors.js';
 import { createExecutionsApi } from './executions.js';
 import { createIntelligenceApi } from './intelligence.js';
 import { createPublishingApi } from './publishing.js';
-import { readStoredCredentials } from './storage.js';
+// NOTE: `./storage.js` is intentionally NOT imported at module load time —
+// it depends on Node-only modules (`node:fs/promises`, `node:os`, `node:path`)
+// and would break browser bundlers (Vite, webpack, etc.) at build time.
+// `fromStoredCredentials()` lazy-loads it via dynamic `import()` so the
+// browser bundle never reaches it.
 import type {
   LaminaClientOptions,
   LaminaRequestFn,
@@ -84,7 +88,12 @@ export class LaminaClient {
   static async fromStoredCredentials(
     options: Omit<LaminaClientOptions, 'apiKey'> & { credentials?: StoredLaminaCredentials | null } = {}
   ): Promise<LaminaClient> {
-    const stored = options.credentials ?? (await readStoredCredentials());
+    // Lazy-import: see top-of-file note. Pulling './storage.js' through a
+    // dynamic import means it only loads when this method is called (CLI
+    // contexts), keeping browser bundles free of Node imports.
+    const stored =
+      options.credentials ??
+      (await (await import('./storage.js')).readStoredCredentials());
     if (!stored) {
       throw new Error(
         'No stored Lamina credentials found. Run the CLI login flow or provide an apiKey explicitly.'
