@@ -612,6 +612,53 @@ export interface ContentBriefResult {
   concepts: ContentConcept[];
 }
 
+// ─── POST /v1/content/auto-generate ──────────────────────────────────────────
+
+export interface AutoGenerateParams {
+  brief: string;
+  document: Record<string, unknown>;
+  fieldName?: string;
+  fieldDescription?: string;
+  constraints?: {
+    modality?: 'image' | 'video' | 'audio' | 'text';
+    aspectRatio?: string;
+    outputFormats?: string[];
+  };
+  appId?: string;
+  webhookUrl?: string;
+  agentSessionId?: string;
+}
+
+export interface AgentTraceStep {
+  iteration: number;
+  toolName: 'searchApps' | 'getApp' | 'validateInputs' | 'startRun' | 'returnNeedsChoice';
+  args: unknown;
+  result: unknown;
+}
+
+export interface AutoGenerateStarted {
+  status: 'started';
+  runId: string;
+  selectedApp: { appId: string; name: string; rationale: string };
+  draftedInputs: Record<string, unknown>;
+  agentTrace?: AgentTraceStep[];
+}
+
+export interface AutoGenerateNeedsChoice {
+  status: 'needs_choice';
+  reason: string;
+  candidates: Array<{
+    appId: string;
+    name: string;
+    description: string;
+    missingRequiredInputs: string[];
+    draftableInputs: Record<string, unknown>;
+  }>;
+  agentTrace?: AgentTraceStep[];
+}
+
+export type AutoGenerateResult = AutoGenerateStarted | AutoGenerateNeedsChoice;
+
 // ─── Runs API: new endpoints ──────────────────────────────────────────────
 
 export interface ServerWaitOptions {

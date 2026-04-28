@@ -1,5 +1,7 @@
 import type {
   ApiEnvelope,
+  AutoGenerateParams,
+  AutoGenerateResult,
   ContentBriefParams,
   ContentBriefResult,
   LaminaCreateParams,
@@ -26,6 +28,13 @@ export function createContentApi(request: LaminaRequestFn) {
 
     brief(params: ContentBriefParams) {
       return request<ApiEnvelope<ContentBriefResult>>('/v1/content/brief', {
+        method: 'POST',
+        body: params,
+      });
+    },
+
+    autoGenerate(params: AutoGenerateParams) {
+      return request<ApiEnvelope<AutoGenerateResult>>('/v1/content/auto-generate', {
         method: 'POST',
         body: params,
       });
