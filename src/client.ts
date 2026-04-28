@@ -15,7 +15,6 @@ import type {
   LaminaClientOptions,
   LaminaRequestFn,
   LaminaRequestInit,
-  StoredLaminaCredentials,
 } from './types.js';
 import { createWebhooksApi } from './webhooks.js';
 
@@ -85,27 +84,19 @@ export class LaminaClient {
     });
   }
 
-  static async fromStoredCredentials(
-    options: Omit<LaminaClientOptions, 'apiKey'> & { credentials?: StoredLaminaCredentials | null } = {}
-  ): Promise<LaminaClient> {
-    // Lazy-import: see top-of-file note. Pulling './storage.js' through a
-    // dynamic import means it only loads when this method is called (CLI
-    // contexts), keeping browser bundles free of Node imports.
-    const stored =
-      options.credentials ??
-      (await (await import('./storage.js')).readStoredCredentials());
-    if (!stored) {
-      throw new Error(
-        'No stored Lamina credentials found. Run the CLI login flow or provide an apiKey explicitly.'
-      );
-    }
-
-    return new LaminaClient({
-      ...options,
-      apiKey: stored.apiKey,
-      baseUrl: options.baseUrl || stored.baseUrl,
-    });
-  }
+  // `fromStoredCredentials()` was removed in 0.3.2 — it forced storage.js
+  // (Node-only) into browser bundles via a dynamic import that bundlers
+  // still walk and bundle as a code-split chunk. CLI users who want the
+  // same behavior compose it explicitly:
+  //
+  //   import { LaminaClient } from '@uselamina/sdk';
+  //   import { readStoredCredentials } from '@uselamina/sdk/storage';
+  //
+  //   const stored = await readStoredCredentials();
+  //   const client = new LaminaClient({
+  //     apiKey: stored.apiKey,
+  //     baseUrl: stored.baseUrl,
+  //   });
 
   async request<T>(path: string, init: LaminaRequestInit = {}): Promise<T> {
     const headers = new Headers(init.headers || {});
