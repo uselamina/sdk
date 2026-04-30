@@ -5,6 +5,7 @@ export { LaminaAuthError, LaminaError, LaminaRateLimitError } from './errors.js'
 export { createContentApi } from './content.js';
 /** @deprecated Use `createContentApi` instead */
 export { createContentApi as createCompoundApi } from './content.js';
+export { createFreestyleApi } from './freestyle.js';
 export { createIntelligenceApi } from './intelligence.js';
 export { createPublishingApi } from './publishing.js';
 export { LaminaWebhookListener } from './webhookListener.js';

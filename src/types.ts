@@ -627,6 +627,8 @@ export interface AutoGenerateParams {
   appId?: string;
   webhookUrl?: string;
   agentSessionId?: string;
+  /** Number of variants to generate when the agent picks the freestyle path. Server clamps to [1, 8]. */
+  numVariants?: number;
 }
 
 export interface AgentTraceStep {
@@ -639,8 +641,21 @@ export interface AgentTraceStep {
 export interface AutoGenerateStarted {
   status: 'started';
   runId: string;
-  selectedApp: { appId: string; name: string; rationale: string };
-  draftedInputs: Record<string, unknown>;
+  /**
+   * Set to 'freestyle' when the agent dispatched parallel FAL calls (no app match).
+   * When present, poll via `client.freestyle.wait(runId)` instead of `client.runs.wait(runId)`.
+   * Absent (or 'app') for normal app-run starts.
+   */
+  mode?: 'freestyle' | 'app';
+  /** App-run only. Absent on freestyle. */
+  selectedApp?: { appId: string; name: string; rationale: string };
+  /** App-run only. Absent on freestyle. */
+  draftedInputs?: Record<string, unknown>;
+  /** Freestyle-only enrichments. */
+  reason?: string;
+  numVariants?: number;
+  submittedCount?: number;
+  failedCount?: number;
   agentTrace?: AgentTraceStep[];
 }
 

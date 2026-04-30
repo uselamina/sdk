@@ -4,6 +4,7 @@ import { createContentApi } from './content.js';
 import { resolveClientOptions } from './config.js';
 import { createLaminaError } from './errors.js';
 import { createExecutionsApi } from './executions.js';
+import { createFreestyleApi } from './freestyle.js';
 import { createIntelligenceApi } from './intelligence.js';
 import { createPublishingApi } from './publishing.js';
 // NOTE: `./storage.js` is intentionally NOT imported at module load time —
@@ -55,6 +56,7 @@ export class LaminaClient {
   readonly runs: ReturnType<typeof createExecutionsApi>;
   /** @deprecated Use `.runs` instead */
   readonly executions: ReturnType<typeof createExecutionsApi>;
+  readonly freestyle: ReturnType<typeof createFreestyleApi>;
   readonly intelligence: ReturnType<typeof createIntelligenceApi>;
   readonly publishing: ReturnType<typeof createPublishingApi>;
   readonly webhooks: ReturnType<typeof createWebhooksApi>;
@@ -72,6 +74,7 @@ export class LaminaClient {
     this.compound = this.content; // backward compat
     this.runs = createExecutionsApi(request);
     this.executions = this.runs; // backward compat
+    this.freestyle = createFreestyleApi(request);
     this.intelligence = createIntelligenceApi(request);
     this.publishing = createPublishingApi(request);
     this.webhooks = createWebhooksApi(request);
