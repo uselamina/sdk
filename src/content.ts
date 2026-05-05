@@ -7,6 +7,10 @@ import type {
   LaminaCreateParams,
   LaminaCreateResult,
   LaminaRequestFn,
+  PreviewRunParams,
+  PreviewRunResult,
+  RunConfirmedParams,
+  RunConfirmedResult,
   ScoreContentParams,
 } from './types.js';
 
@@ -35,6 +39,33 @@ export function createContentApi(request: LaminaRequestFn) {
 
     autoGenerate(params: AutoGenerateParams) {
       return request<ApiEnvelope<AutoGenerateResult>>('/v1/content/auto-generate', {
+        method: 'POST',
+        body: params,
+      });
+    },
+
+    /**
+     * Preview-then-confirm flow: agent drafts the plan WITHOUT dispatching.
+     * Returns chosen app + drafted inputs + missing inputs (with suggested
+     * defaults), OR a freestyle recipe, OR a multi-app choice. Caller renders
+     * a decision card; user reviews + completes; caller invokes `run()` to
+     * actually dispatch.
+     */
+    previewRun(params: PreviewRunParams) {
+      return request<ApiEnvelope<PreviewRunResult>>('/v1/content/preview-run', {
+        method: 'POST',
+        body: params,
+      });
+    },
+
+    /**
+     * Dispatch the confirmed plan returned by `previewRun()` (with any user
+     * edits to drafted/missing inputs). Returns `{ runId, mode, ... }` —
+     * caller polls via `client.runs.wait(runId)` (mode='app') or
+     * `client.freestyle.wait(runId)` (mode='freestyle').
+     */
+    run(params: RunConfirmedParams) {
+      return request<ApiEnvelope<RunConfirmedResult>>('/v1/content/run', {
         method: 'POST',
         body: params,
       });

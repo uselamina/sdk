@@ -39,6 +39,8 @@ export interface AppSummary {
   modality?: string | null;
   outputFormats?: string[];
   inputSummary?: AppInputSummary;
+  /** Optional empty-state media (image/video URL) usable as a card preview. */
+  thumbnail?: AppThumbnail | null;
 }
 
 export interface ParameterOption {
@@ -228,6 +230,13 @@ export interface DiscoverAppsParams {
   limit?: number;
 }
 
+/** Optional empty-state media derived from `parameter_definitions.settings.emptyStateMedia`.
+ *  Present when the app has a recognised image/video URL there. */
+export interface AppThumbnail {
+  url: string;
+  type: 'image' | 'video';
+}
+
 export interface DiscoveredApp {
   appId: string;
   name: string;
@@ -236,6 +245,8 @@ export interface DiscoveredApp {
   capabilities: AppCapabilities | null;
   estimatedCredits: number | null;
   whyMatch: string;
+  /** Optional thumbnail (image or video URL) usable as a card preview. */
+  thumbnail?: AppThumbnail | null;
 }
 
 export interface DiscoverAppsResult {
@@ -673,6 +684,192 @@ export interface AutoGenerateNeedsChoice {
 }
 
 export type AutoGenerateResult = AutoGenerateStarted | AutoGenerateNeedsChoice;
+
+// ─── Preview-Run flow (non-dispatching review-then-confirm) ──────────────────
+//
+// `preview-run` runs the content-router agent in PREVIEW MODE. It returns the
+// agent's PROPOSED plan (chosen app + drafted inputs + missing inputs OR
+// freestyle recipe) WITHOUT dispatching anything. The caller (plugin) renders a
+// decision card; user reviews, edits, fills missing, and clicks Generate-confirm
+// to call `content.run()` which actually dispatches.
+
+export interface PreviewRunParams {
+  brief: string;
+  document: Record<string, unknown>;
+  fieldName?: string;
+  fieldDescription?: string;
+  constraints?: {
+    modality?: 'image' | 'video' | 'audio' | 'text';
+    aspectRatio?: string;
+    outputFormats?: string[];
+  };
+  /** When the user explicitly picked an app from the picker. Server skips searchApps. */
+  appId?: string;
+  numVariants?: number;
+}
+
+/** Per-input source label. Tells the user where a value came from. */
+export type DraftedInputSource =
+  | `doc.${string}`
+  | 'agent_creative'
+  | 'agent_inferred'
+  | 'agent_inferred_url';
+
+export interface DraftedInput {
+  value: unknown;
+  source: DraftedInputSource;
+}
+
+export interface SuggestedDefault {
+  source: string; // e.g., 'doc.coverImage'
+  value: unknown;
+  label: string; // human-readable, e.g., 'Image from this doc'
+}
+
+/**
+ * Agent-emitted form-spec field. The agent decides per missing input which
+ * widget the plugin should render — kind+question+(options|placeholder|accept) —
+ * so exotic app input types (productPicker, colorPicker, aspectRatio, etc.)
+ * get translated by the LLM into one of these 5 Sanity-renderable widgets
+ * rather than relying on a deterministic SDK-side type collapse.
+ *
+ * The plugin renders this with a pure `switch (field.kind)`. No widget logic
+ * outside this file.
+ */
+export interface FormFieldBase {
+  /** App parameter name. Must match a real input declared by the app. */
+  name: string;
+  /** User-facing question (agent-authored — phrased for the user, not the schema). */
+  question: string;
+  /** Server-suggested default the user can one-tap accept. */
+  suggestedDefault?: SuggestedDefault | null;
+}
+
+export interface FormFieldText extends FormFieldBase {
+  kind: 'text';
+  /** Optional hint, e.g. 'e.g. 16:9' for an aspect-ratio-as-text field. */
+  placeholder?: string;
+}
+
+export interface FormFieldSelect extends FormFieldBase {
+  kind: 'select';
+  /** Choices the agent picked. For app params with declared options this MUST
+   *  be a subset; for free-form types the agent may invent a small enum. */
+  options: string[];
+}
+
+export interface FormFieldMedia extends FormFieldBase {
+  /** Renders as a URL paste field with media-typed placeholder. Real Sanity
+   *  asset upload is a future swap of this widget. */
+  kind: 'image' | 'video' | 'audio';
+}
+
+export type FormField = FormFieldText | FormFieldSelect | FormFieldMedia;
+
+export interface PreviewAppMode {
+  mode: 'app';
+  selectedApp: {
+    appId: string;
+    name: string;
+    description?: string | null;
+    rationale: string;
+    schema?: unknown[]; // app's full input schema (agent-friendly shape)
+  };
+  draftedInputs: Record<string, DraftedInput>;
+  /**
+   * Agent-emitted form spec for inputs the agent could not draft. Empty array
+   * means "everything was drafted — auto-dispatch, no UI". Non-empty means
+   * render the form. Plugin renders pure switch on `field.kind`.
+   */
+  form: FormField[];
+  estimate: { credits: { expected: number; min: number; max: number } | null; manageUrl: string | null };
+}
+
+export interface PreviewFreestyleMode {
+  mode: 'freestyle';
+  freestylePlan: {
+    modality: 'image' | 'video';
+    rationale: string;
+    variants: Array<Record<string, unknown>>; // per-variant model picks + prompts
+  };
+  estimate: { credits: null; manageUrl: null };
+}
+
+export interface PreviewNeedsChoiceMode {
+  mode: 'needs_choice';
+  reason: string;
+  candidates: Array<{
+    appId: string;
+    name: string;
+    description?: string;
+    missingRequiredInputs: string[];
+    draftableInputs: Record<string, unknown>;
+  }>;
+}
+
+/**
+ * Returned when the agent could not produce a valid form spec after the
+ * configured retry budget. Distinct from 'needs_choice' — that's the agent
+ * saying "I don't know which app fits"; this is "I picked an app but
+ * couldn't describe its missing inputs as a form even after retries".
+ * Plugin should show the errors and let the user retry / pick an app.
+ */
+export interface PreviewAgentFailedMode {
+  mode: 'agent_failed';
+  reason: string;
+  /** Validator error strings from the last failed attempt — surfaced for debugging. */
+  errors: string[];
+  /** App the agent had picked when it failed (so plugin can suggest "try this app manually"). */
+  selectedApp?: {
+    appId: string;
+    name: string;
+  } | null;
+}
+
+export type PreviewRunResult =
+  | PreviewAppMode
+  | PreviewFreestyleMode
+  | PreviewNeedsChoiceMode
+  | PreviewAgentFailedMode;
+
+// ─── Confirmed-Run params (the dispatch step after preview) ──────────────────
+
+export interface RunConfirmedAppParams {
+  mode: 'app';
+  appId: string;
+  inputs: Record<string, unknown>;
+  rationale?: string;
+  webhookUrl?: string;
+}
+
+export interface RunConfirmedFreestyleParams {
+  mode: 'freestyle';
+  freestyleRecipe: {
+    modality: 'image' | 'video';
+    rationale?: string;
+    variants: Array<Record<string, unknown>>;
+  };
+  intent?: string;
+  metadata?: Record<string, unknown>;
+  numVariants?: number;
+}
+
+export type RunConfirmedParams = RunConfirmedAppParams | RunConfirmedFreestyleParams;
+
+export interface RunConfirmedResult {
+  mode: 'app' | 'freestyle';
+  runId: string;
+  /** App mode only. */
+  selectedApp?: { appId: string; name: string; rationale: string };
+  draftedInputs?: Record<string, unknown>;
+  /** Freestyle mode only. */
+  mediaType?: string;
+  picks?: string;
+  numVariants?: number;
+  submittedCount?: number;
+  failedCount?: number;
+  reason?: string | null;
+}
 
 // ─── Runs API: new endpoints ──────────────────────────────────────────────
 

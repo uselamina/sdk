@@ -1,6 +1,6 @@
 {
   "name": "@uselamina/sdk",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "description": "TypeScript SDK for Lamina — the agentic creative API for generating videos, movies, and images",
   "keywords": [
     "lamina",
