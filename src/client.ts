@@ -1,5 +1,6 @@
 import { createAccountApi } from './account.js';
 import { createAppsApi } from './apps.js';
+import { createAssetsApi } from './assets.js';
 import { requireApiKey } from './auth.js';
 import { createContentApi } from './content.js';
 import { resolveClientOptions } from './config.js';
@@ -52,6 +53,7 @@ export class LaminaClient {
   readonly fetchImpl: typeof globalThis.fetch;
   readonly account: ReturnType<typeof createAccountApi>;
   readonly apps: ReturnType<typeof createAppsApi>;
+  readonly assets: ReturnType<typeof createAssetsApi>;
   readonly content: ReturnType<typeof createContentApi>;
   /** @deprecated Use `.content` instead */
   readonly compound: ReturnType<typeof createContentApi>;
@@ -73,6 +75,7 @@ export class LaminaClient {
     const request: LaminaRequestFn = this.request.bind(this);
     this.account = createAccountApi(request);
     this.apps = createAppsApi(request);
+    this.assets = createAssetsApi(request, this.fetchImpl);
     this.content = createContentApi(request);
     this.compound = this.content; // backward compat
     this.runs = createExecutionsApi(request);

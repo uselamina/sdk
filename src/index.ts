@@ -1,5 +1,16 @@
 export { LaminaClient } from './client.js';
 export { createAccountApi } from './account.js';
+export { createAssetsApi } from './assets.js';
+export type {
+  AssetMediaType,
+  AssetUploadEntry,
+  AssetUploadOptions,
+  AssetUploadResult,
+  AssetUploadSource,
+  AssetUploadUrlsRequest,
+  AssetUploadUrlsRequestFile,
+  AssetUploadUrlsResult,
+} from './assets.js';
 export { requireApiKey, resolveApiKey } from './auth.js';
 export { DEFAULT_BASE_URL, normalizeBaseUrl } from './config.js';
 export { LaminaAuthError, LaminaError, LaminaRateLimitError } from './errors.js';
