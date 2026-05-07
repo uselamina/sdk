@@ -1,4 +1,5 @@
 export { LaminaClient } from './client.js';
+export { createAccountApi } from './account.js';
 export { requireApiKey, resolveApiKey } from './auth.js';
 export { DEFAULT_BASE_URL, normalizeBaseUrl } from './config.js';
 export { LaminaAuthError, LaminaError, LaminaRateLimitError } from './errors.js';
@@ -24,6 +25,10 @@ export {
 } from './integrations/index.js';
 export type { OpenAIToolFunction } from './integrations/index.js';
 export type {
+  AccountMembership,
+  AccountResponse,
+  AccountUser,
+  AccountWorkspace,
   ApiEnvelope,
   AppCapabilities,
   AppThumbnail,
@@ -41,8 +46,8 @@ export type {
   PreviewRunResult,
   PreviewAppMode,
   PreviewFreestyleMode,
-  PreviewNeedsChoiceMode,
   PreviewAgentFailedMode,
+  PreviewWarning,
   DraftedInput,
   DraftedInputSource,
   SuggestedDefault,
@@ -63,6 +68,13 @@ export type {
   ContentBriefParams,
   ContentBriefResult,
   ContentConcept,
+  ContentPlanAskUserItem,
+  ContentPlanBrandSummary,
+  ContentPlanCost,
+  ContentPlanGuidanceSummary,
+  ContentPlanParams,
+  ContentPlanResult,
+  ContentPlanSelectedApp,
   CostEstimate,
   CostEstimateBreakdown,
   DiscoverAppsParams,
@@ -128,5 +140,4 @@ export type {
   WaitForExecutionOptions,
   WaitForWebhookEventOptions,
   WebhookSigningKeyResponse,
-  WorkflowStructure,
 } from './types.js';

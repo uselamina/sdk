@@ -1,4 +1,4 @@
-import type { ApiEnvelope, AppDetail, AppSummary, CostEstimate, DiscoverAppsParams, DiscoverAppsResult, LaminaRequestFn, ListAppsParams, WorkflowStructure } from './types.js';
+import type { ApiEnvelope, AppDetail, AppSummary, CostEstimate, DiscoverAppsParams, DiscoverAppsResult, LaminaRequestFn, ListAppsParams } from './types.js';
 
 function buildListAppsPath(params: ListAppsParams = {}): string {
   const searchParams = new URLSearchParams();
@@ -23,12 +23,6 @@ export function createAppsApi(request: LaminaRequestFn) {
 
     get(appId: string) {
       return request<ApiEnvelope<AppDetail>>(`/v1/apps/${encodeURIComponent(appId)}`);
-    },
-
-    workflow(appId: string) {
-      return request<ApiEnvelope<WorkflowStructure>>(
-        `/v1/apps/${encodeURIComponent(appId)}/workflow`
-      );
     },
 
     estimate(appId: string) {

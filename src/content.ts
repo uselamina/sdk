@@ -4,6 +4,8 @@ import type {
   AutoGenerateResult,
   ContentBriefParams,
   ContentBriefResult,
+  ContentPlanParams,
+  ContentPlanResult,
   LaminaCreateParams,
   LaminaCreateResult,
   LaminaRequestFn,
@@ -39,6 +41,18 @@ export function createContentApi(request: LaminaRequestFn) {
 
     autoGenerate(params: AutoGenerateParams) {
       return request<ApiEnvelope<AutoGenerateResult>>('/v1/content/auto-generate', {
+        method: 'POST',
+        body: params,
+      });
+    },
+
+    /**
+     * Lightweight planner: pick an app, classify each input as
+     * drafted/defaulted/must_supply. Dispatches only when `autoDispatch=true`
+     * and nothing's missing. Use this from CLI or agent contexts.
+     */
+    plan(params: ContentPlanParams) {
+      return request<ApiEnvelope<ContentPlanResult>>('/v1/content/plan', {
         method: 'POST',
         body: params,
       });

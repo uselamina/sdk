@@ -6,6 +6,35 @@ export interface ApiEnvelope<T> {
   data: T;
 }
 
+// ─── Account / identity ─────────────────────────────────────────────────────
+
+/** A workspace the user belongs to, with their role in it. */
+export interface AccountMembership {
+  workspaceId: string;
+  name: string | null;
+  slug: string | null;
+  role: string | null;
+}
+
+/** The active workspace the API key is scoped to. */
+export interface AccountWorkspace {
+  id: string;
+  name: string | null;
+  slug: string | null;
+  role: string | null;
+}
+
+export interface AccountUser {
+  id: string;
+  email: string | null;
+}
+
+export interface AccountResponse {
+  user: AccountUser;
+  workspace: AccountWorkspace | null;
+  memberships: AccountMembership[];
+}
+
 export interface AppCapabilities {
   produces: string[];
   strengths: string[];
@@ -51,6 +80,10 @@ export interface ParameterOption {
 
 export interface Parameter {
   id: string;
+  /** Author-set snake_case identifier (e.g. "your_photo_image_url"). The
+   *  preferred way to reference a parameter when constructing inputs.
+   *  Falls back to `name` or `id` when not set. */
+  key?: string;
   name: string;
   type: LaminaParameterType;
   required: boolean;
@@ -67,24 +100,6 @@ export interface AppDetail {
   description: string | null;
   parameters: Parameter[];
   capabilities: AppCapabilities | null;
-}
-
-export interface WorkflowNode {
-  id: string;
-  type: string;
-  label: string;
-}
-
-export interface WorkflowEdge {
-  source: string;
-  target: string;
-}
-
-export interface WorkflowStructure {
-  appId: string;
-  name: string;
-  nodes: WorkflowNode[];
-  edges: WorkflowEdge[];
 }
 
 export interface SuggestedNextStep {
@@ -623,6 +638,108 @@ export interface ContentBriefResult {
   concepts: ContentConcept[];
 }
 
+// ─── POST /v1/content/plan ───────────────────────────────────────────────────
+// Lightweight planner: given a brief, picks an app and classifies each input
+// as drafted | defaulted | must_supply. With autoDispatch=true, dispatches when
+// nothing's missing. Otherwise always returns a plan and never dispatches.
+
+export interface ContentPlanParams {
+  brief: string;
+  appId?: string;
+  platform?: string;
+  modality?: string;
+  brandProfileId?: string;
+  campaignId?: string;
+  /** POSTed to on completion (only used when the planner dispatches). */
+  webhookUrl?: string;
+  /**
+   * Default false → dispatch when askUser is empty. Pass `true` to never
+   * dispatch (preview-then-apply mode).
+   */
+  planOnly?: boolean;
+}
+
+export interface ContentPlanSelectedApp {
+  /**
+   * App UUID when an app was picked, or `null` when the planner fell back
+   * to a freestyle model (no catalog app matched). Callers should not
+   * special-case freestyle for display — `name`, `purpose`, `rationale`
+   * are populated identically in both cases.
+   */
+  appId: string | null;
+  name: string;
+  /** One-line summary of what the app/model does. */
+  purpose: string;
+  /** One-sentence reason this was picked for this brief. */
+  rationale: string;
+  /** Confidence in [0, 1]. */
+  confidence: number;
+}
+
+export interface ContentPlanAskUserItem {
+  /** Parameter key (snake_case) that needs to be supplied. */
+  key: string;
+  /** Schema type (`url`, `text`, `options`, ...). */
+  type: string;
+  /** What this input controls in the output, in plain language. */
+  purpose: string;
+  /** Question to relay to the user. */
+  askUser: string;
+}
+
+export interface ContentPlanCost {
+  /** Best estimate. */
+  expected: number;
+  /** Lower bound. */
+  min: number;
+  /** Upper bound (workflow may retry / branch). */
+  max: number;
+}
+
+export interface ContentPlanBrandSummary {
+  voiceAttributes: string[];
+  contentPillars: string[];
+  guardrails: string[];
+}
+
+export interface ContentPlanGuidanceSummary {
+  promptDirectives: string[];
+  negativePrompts: string[];
+}
+
+export interface ContentPlanResult {
+  status: 'dispatched' | 'needs_input' | 'unmatched';
+  /** Null when status is `unmatched`. */
+  selectedApp: ContentPlanSelectedApp | null;
+  /** Inputs the agent filled directly from the brief. */
+  drafted: Record<string, unknown>;
+  /** Inputs taking the workflow author's default. */
+  defaulted: Record<string, unknown>;
+  /** Inputs the caller must collect from the user. */
+  askUser: ContentPlanAskUserItem[];
+  /** Estimated credit cost for the chosen app. Null when unestimable. */
+  cost: ContentPlanCost | null;
+  /** Workspace brand context applied to drafting. Null when not configured. */
+  brandContext: ContentPlanBrandSummary | null;
+  /** Active guidance package applied to drafting. Null when not configured. */
+  guidanceSummary: ContentPlanGuidanceSummary | null;
+  /** Set when status=`dispatched`. */
+  runId: string | null;
+  /**
+   * Discriminates which polling endpoint resolves the runId. `app` runs use
+   * `client.runs.wait(runId)` / `lamina runs wait`. `freestyle` runs use
+   * `client.freestyle.wait(runId)` because the planner fell back to a base
+   * model. Null when no run was dispatched.
+   */
+  runType: 'app' | 'freestyle' | null;
+  /** True when the dispatched run will POST to the request's webhookUrl. */
+  webhookEnabled: boolean;
+  /** Suggested `lamina run ...` command when status=`needs_input` and askUser is empty. */
+  dispatchHint: string | null;
+  /** Set when status=`unmatched`. */
+  reason?: string;
+}
+
 // ─── POST /v1/content/auto-generate ──────────────────────────────────────────
 
 export interface AutoGenerateParams {
@@ -739,9 +856,9 @@ export interface SuggestedDefault {
 export interface FormFieldBase {
   /** App parameter name. Must match a real input declared by the app. */
   name: string;
-  /** User-facing question (agent-authored — phrased for the user, not the schema). */
+  /** User-facing question (agent-authored when the agent asked, schema-derived otherwise). */
   question: string;
-  /** Server-suggested default the user can one-tap accept. */
+  /** Server-suggested default the user can one-tap accept (e.g., a doc-asset URL for media kinds). */
   suggestedDefault?: SuggestedDefault | null;
 }
 
@@ -766,6 +883,18 @@ export interface FormFieldMedia extends FormFieldBase {
 
 export type FormField = FormFieldText | FormFieldSelect | FormFieldMedia;
 
+/**
+ * A note from the agent about a user-supplied dialog setting (aspectRatio,
+ * numVariants, etc.) that the chosen app cannot honor. Surfaced to the user
+ * as a muted info line so they know what's happening transparently.
+ */
+export interface PreviewWarning {
+  /** Dialog control name — e.g. "aspectRatio", "numVariants", "outputFormats". */
+  field: string;
+  /** One-sentence user-facing message — e.g. "This app produces a fixed 16:9 layout — your 9:16 selection won't apply." */
+  message: string;
+}
+
 export interface PreviewAppMode {
   mode: 'app';
   selectedApp: {
@@ -782,6 +911,12 @@ export interface PreviewAppMode {
    * render the form. Plugin renders pure switch on `field.kind`.
    */
   form: FormField[];
+  /**
+   * Agent-emitted warnings for user dialog settings the chosen app cannot
+   * honor. Empty when everything was applied successfully. Plugin renders
+   * these as a muted info line above the form / variants.
+   */
+  warnings?: PreviewWarning[];
   estimate: { credits: { expected: number; min: number; max: number } | null; manageUrl: string | null };
 }
 
@@ -795,24 +930,9 @@ export interface PreviewFreestyleMode {
   estimate: { credits: null; manageUrl: null };
 }
 
-export interface PreviewNeedsChoiceMode {
-  mode: 'needs_choice';
-  reason: string;
-  candidates: Array<{
-    appId: string;
-    name: string;
-    description?: string;
-    missingRequiredInputs: string[];
-    draftableInputs: Record<string, unknown>;
-  }>;
-}
-
 /**
- * Returned when the agent could not produce a valid form spec after the
- * configured retry budget. Distinct from 'needs_choice' — that's the agent
- * saying "I don't know which app fits"; this is "I picked an app but
- * couldn't describe its missing inputs as a form even after retries".
- * Plugin should show the errors and let the user retry / pick an app.
+ * Returned when the agent could not produce a valid plan. Plugin should
+ * show the errors and let the user retry / pick an app manually.
  */
 export interface PreviewAgentFailedMode {
   mode: 'agent_failed';
@@ -829,7 +949,6 @@ export interface PreviewAgentFailedMode {
 export type PreviewRunResult =
   | PreviewAppMode
   | PreviewFreestyleMode
-  | PreviewNeedsChoiceMode
   | PreviewAgentFailedMode;
 
 // ─── Confirmed-Run params (the dispatch step after preview) ──────────────────
