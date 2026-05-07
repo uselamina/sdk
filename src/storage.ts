@@ -66,12 +66,18 @@ export async function readStoredCredentials(
     return null;
   }
 
-  const { apiKey, baseUrl, savedAt } = parsed.credentials;
+  const { apiKey, baseUrl, savedAt, kind, refreshToken, expiresAt, clientId, scope } =
+    parsed.credentials;
   if (!apiKey || !baseUrl || !savedAt) {
     return null;
   }
+  // `kind` is required. Missing or unrecognized → treat the stored creds
+  // as invalid; the CLI will prompt for `lamina login` rather than guess.
+  if (kind !== 'apikey' && kind !== 'oauth') {
+    return null;
+  }
 
-  return { apiKey, baseUrl, savedAt };
+  return { kind, apiKey, baseUrl, savedAt, refreshToken, expiresAt, clientId, scope };
 }
 
 export async function readStoredWebhookConfig(

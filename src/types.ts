@@ -183,10 +183,33 @@ export interface LaminaErrorBody {
   [key: string]: unknown;
 }
 
+/**
+ * Stored credential. Two shapes share this type, discriminated by `kind`:
+ *
+ * - **`kind: 'apikey'`** — `apiKey` holds a workspace API key (`lma_…`).
+ *   Static; no refresh. Used for CI / scripted callers.
+ *
+ * - **`kind: 'oauth'`** — `apiKey` holds the OAuth access token
+ *   (`lma_mcp_at_…`); `refreshToken`, `expiresAt`, `clientId`, `scope` are
+ *   populated. The server accepts both shapes interchangeably via the
+ *   same `x-api-key` / `Authorization: Bearer` header, so the SDK doesn't
+ *   need to branch — callers just pass `apiKey` to `LaminaClient`. The
+ *   refresh fields let `@uselamina/cli` rotate tokens silently before
+ *   they expire (see `lib/tokenRefresh.ts` in lamina-cli).
+ */
 export interface StoredLaminaCredentials {
+  kind: 'apikey' | 'oauth';
   apiKey: string;
   baseUrl: string;
   savedAt: string;
+  /** OAuth refresh token. Required when `kind === 'oauth'`. */
+  refreshToken?: string;
+  /** ISO 8601 access-token expiry. Required when `kind === 'oauth'`. */
+  expiresAt?: string;
+  /** OAuth client_id used for refresh. Required when `kind === 'oauth'`. */
+  clientId?: string;
+  /** Granted OAuth scopes. Required when `kind === 'oauth'`. */
+  scope?: string;
 }
 
 export interface StoredLaminaConfig {
