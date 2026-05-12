@@ -668,18 +668,25 @@ export interface ContentBriefResult {
 
 export interface ContentPlanParams {
   brief: string;
+  /** Pin a specific app; the router skips searching and goes straight to drafting on this app. */
   appId?: string;
+  /** Platform hint (instagram, linkedin, …). */
   platform?: string;
+  /** Modality hint: 'image' | 'video'. */
   modality?: string;
+  /** Apply a specific brand profile. */
   brandProfileId?: string;
   campaignId?: string;
-  /** POSTed to on completion (only used when the planner dispatches). */
+  /** Not used by `plan` — kept for backwards compatibility. */
   webhookUrl?: string;
   /**
-   * Default false → dispatch when askUser is empty. Pass `true` to never
-   * dispatch (preview-then-apply mode).
+   * Values the calling agent has already gathered from the human. The router
+   * agent relays them verbatim and will NOT re-ask for them. Use this when
+   * looping through askUser: collect answers, pass them back on next call.
    */
-  planOnly?: boolean;
+  inputs?: Record<string, unknown>;
+  /** Number of variants if the agent falls back to a recipe. Default 1. */
+  numVariants?: number;
 }
 
 export interface ContentPlanSelectedApp {
@@ -700,14 +707,24 @@ export interface ContentPlanSelectedApp {
 }
 
 export interface ContentPlanAskUserItem {
-  /** Parameter key (snake_case) that needs to be supplied. */
-  key: string;
-  /** Schema type (`url`, `text`, `options`, ...). */
-  type: string;
-  /** What this input controls in the output, in plain language. */
-  purpose: string;
-  /** Question to relay to the user. */
-  askUser: string;
+  /** Parameter name (or key) the agent needs a value for. */
+  name: string;
+  /** Conversational question to ask the human in chat. */
+  question: string;
+}
+
+export interface ContentPlanWarning {
+  /** The hint/setting field the warning is about (e.g. "aspectRatio"). */
+  field: string;
+  /** Plain-language explanation of what will happen instead. */
+  message: string;
+}
+
+export interface ContentPlanSelectedAppRef {
+  appId: string;
+  name: string;
+  /** One-sentence reason this was picked for this brief. */
+  rationale: string;
 }
 
 export interface ContentPlanCost {
@@ -730,38 +747,74 @@ export interface ContentPlanGuidanceSummary {
   negativePrompts: string[];
 }
 
-export interface ContentPlanResult {
-  status: 'dispatched' | 'needs_input' | 'unmatched';
-  /** Null when status is `unmatched`. */
-  selectedApp: ContentPlanSelectedApp | null;
-  /** Inputs the agent filled directly from the brief. */
-  drafted: Record<string, unknown>;
-  /** Inputs taking the workflow author's default. */
-  defaulted: Record<string, unknown>;
-  /** Inputs the caller must collect from the user. */
-  askUser: ContentPlanAskUserItem[];
-  /** Estimated credit cost for the chosen app. Null when unestimable. */
-  cost: ContentPlanCost | null;
-  /** Workspace brand context applied to drafting. Null when not configured. */
-  brandContext: ContentPlanBrandSummary | null;
-  /** Active guidance package applied to drafting. Null when not configured. */
-  guidanceSummary: ContentPlanGuidanceSummary | null;
-  /** Set when status=`dispatched`. */
-  runId: string | null;
-  /**
-   * Discriminates which polling endpoint resolves the runId. `app` runs use
-   * `client.runs.wait(runId)` / `lamina runs wait`. `freestyle` runs use
-   * `client.freestyle.wait(runId)` because the planner fell back to a base
-   * model. Null when no run was dispatched.
-   */
-  runType: 'app' | 'freestyle' | null;
-  /** True when the dispatched run will POST to the request's webhookUrl. */
-  webhookEnabled: boolean;
-  /** Suggested `lamina run ...` command when status=`needs_input` and askUser is empty. */
-  dispatchHint: string | null;
-  /** Set when status=`unmatched`. */
-  reason?: string;
+/** Per-variant recipe spec (image or video) emitted by the dynamic-planner
+ *  agent when no catalog app fits the brief. The CLI saves this to a local
+ *  file (`~/.lamina/recipes/<id>.json`) and dispatches via `lamina run
+ *  --recipe-file <path>`. */
+export interface ContentPlanRecipeVariant {
+  imageModel: string;
+  imageParams?: Record<string, unknown>;
+  prompt?: string;
+  styleHint?: string | null;
+  // Video-specific (image-to-video pipeline)
+  videoModel?: string;
+  videoParams?: Record<string, unknown>;
+  imagePrompt?: string;
+  videoMotionPrompt?: string;
+  videoShots?: Array<{ prompt: string; duration: string }>;
 }
+
+export interface ContentPlanRecipe {
+  modality: 'image' | 'video';
+  reason?: string;
+  variants: ContentPlanRecipeVariant[];
+}
+
+/**
+ * Result of `POST /v1/content/plan`. This route NEVER dispatches — it always
+ * returns the agent's decision as a plan for the calling agent to inspect.
+ *
+ * The calling agent's job after receiving a plan:
+ *   1. If `askUser` is non-empty, ask the human each question; collect answers.
+ *      For any local file path in answers, upload via `lamina assets upload`
+ *      and use the returned URL.
+ *   2. Dispatch deterministically via `lamina run`:
+ *        mode='app'    → `lamina run <selectedApp.appId> --input k=v ... --wait`
+ *        mode='recipe' → `lamina run --recipe-file <local-recipe-path> --input k=v ... --wait`
+ *      Do NOT re-invoke `content.plan()` — that would run the LLM again and
+ *      risk picking a different app.
+ */
+export type ContentPlanResult =
+  | {
+      status: 'plan';
+      mode: 'app';
+      /** App the agent picked. */
+      selectedApp: ContentPlanSelectedAppRef;
+      /** Inputs the agent drafted from the brief + brand context + provided inputs. */
+      draftedInputs: Record<string, unknown>;
+      /** Questions the calling agent must ask the human. May be empty. */
+      askUser: ContentPlanAskUserItem[];
+      /** Soft-setting mismatches the agent surfaced (e.g. aspectRatio not supported). */
+      warnings: ContentPlanWarning[];
+    }
+  | {
+      status: 'plan';
+      mode: 'recipe';
+      /** Recipe spec the dynamic-planner agent emitted when no catalog app fit. */
+      recipe: ContentPlanRecipe;
+      modality: 'image' | 'video';
+      /** Questions the calling agent must ask the human. May be empty. */
+      askUser: ContentPlanAskUserItem[];
+      /** Soft-setting mismatches. */
+      warnings: ContentPlanWarning[];
+    }
+  | {
+      status: 'unmatched';
+      /** Plain-language reason no app or recipe could be drafted. */
+      reason: string;
+      /** Validator / agent errors (rare). */
+      errors?: string[];
+    };
 
 // ─── POST /v1/content/auto-generate ──────────────────────────────────────────
 
@@ -994,6 +1047,11 @@ export interface RunConfirmedFreestyleParams {
   intent?: string;
   metadata?: Record<string, unknown>;
   numVariants?: number;
+  /** POSTed to on completion by the server. Supported for both app and
+   *  freestyle modes by /v1/content/run; surfaced here for the freestyle
+   *  case so the CLI's `lamina run --recipe-file --webhook <url>` can pass
+   *  it through. */
+  webhookUrl?: string;
 }
 
 export type RunConfirmedParams = RunConfirmedAppParams | RunConfirmedFreestyleParams;

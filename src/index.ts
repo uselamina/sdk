@@ -86,6 +86,8 @@ export type {
   ContentPlanParams,
   ContentPlanResult,
   ContentPlanSelectedApp,
+  ContentPlanSelectedAppRef,
+  ContentPlanWarning,
   CostEstimate,
   CostEstimateBreakdown,
   DiscoverAppsParams,
