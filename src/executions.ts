@@ -8,6 +8,7 @@ import type {
   LaminaRequestFn,
   ListRunsParams,
   ListRunsResult,
+  RunCancelResult,
   RunExecutionParams,
   ServerWaitEnvelope,
   ServerWaitOptions,
@@ -22,9 +23,17 @@ export function createExecutionsApi(request: LaminaRequestFn) {
         path.searchParams.set('webhook', params.webhook);
       }
 
+      // `outputs` (optional) is the agent-friendly partial-execution selector
+      // — array of label strings from the app's `outputs[]`. Server resolves
+      // label → node ID(s). Omitted: full workflow runs (default).
+      const body: Record<string, unknown> = { inputs: params.inputs };
+      if (params.outputs && params.outputs.length > 0) {
+        body.outputs = params.outputs;
+      }
+
       return request<ApiEnvelope<ExecutionStarted>>(`${path.pathname}${path.search}`, {
         method: 'POST',
-        body: { inputs: params.inputs },
+        body,
       });
     },
 
@@ -44,6 +53,13 @@ export function createExecutionsApi(request: LaminaRequestFn) {
         path.searchParams.set('timeout', String(options.timeout));
       }
       return request<ServerWaitEnvelope>(`${path.pathname}${path.search}`);
+    },
+
+    cancel(runId: string) {
+      return request<ApiEnvelope<RunCancelResult>>(
+        `/v1/runs/${encodeURIComponent(runId)}/cancel`,
+        { method: 'POST' }
+      );
     },
 
     feedback(runId: string, params: FeedbackParams) {

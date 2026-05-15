@@ -94,12 +94,23 @@ export interface Parameter {
   multiple?: boolean;
 }
 
+/** A single output an app produces. Returned by `client.apps.get`. */
+export interface AppOutputDescriptor {
+  /** 0-based position in this `outputs[]` array. */
+  index: number;
+  /** Human-readable label set by the workflow author (or `"Output N"` fallback). */
+  label: string;
+  /** Semantic modality this output emits. */
+  type: 'image' | 'video' | 'audio' | 'text';
+}
+
 export interface AppDetail {
   appId: string;
   name: string;
   description: string | null;
   parameters: Parameter[];
-  capabilities: AppCapabilities | null;
+  /** What outputs the app produces. Use these `label` values to select a subset via `RunExecutionParams.outputs`. */
+  outputs: AppOutputDescriptor[];
 }
 
 export interface SuggestedNextStep {
@@ -233,6 +244,16 @@ export interface WaitForExecutionOptions {
 export interface RunExecutionParams {
   inputs: Record<string, unknown>;
   webhook?: string;
+  /**
+   * Optional subset of the app's outputs to generate. Each entry is a
+   * label from the `outputs[]` array returned by `client.apps.get(appId)`
+   * (case-insensitive). Omit to run the full workflow (default).
+   *
+   * When a label matches multiple outputs in the app's workflow (rare —
+   * authors normally curate via the studio's output-display settings),
+   * ALL matching outputs run.
+   */
+  outputs?: string[];
 }
 
 export interface ListAppsParams {
@@ -792,6 +813,14 @@ export type ContentPlanResult =
       selectedApp: ContentPlanSelectedAppRef;
       /** Inputs the agent drafted from the brief + brand context + provided inputs. */
       draftedInputs: Record<string, unknown>;
+      /**
+       * Optional subset of the app's outputs the agent picked based on
+       * explicit cues in the brief (e.g. "just the front view"). Each entry
+       * is a label from the app's `outputs[]` (see `client.apps.get(appId)`).
+       * Pass each to `lamina run --output "<label>"` when dispatching. When
+       * absent, run the full workflow (all outputs).
+       */
+      selectedOutputs?: string[];
       /** Questions the calling agent must ask the human. May be empty. */
       askUser: ContentPlanAskUserItem[];
       /** Soft-setting mismatches the agent surfaced (e.g. aspectRatio not supported). */
@@ -809,12 +838,31 @@ export type ContentPlanResult =
       warnings: ContentPlanWarning[];
     }
   | {
+      status: 'needs_clarification';
+      /**
+       * Strategic questions the agent paused on before committing to a plan.
+       * The calling agent surfaces each to the human, folds the answers into
+       * a refined brief, and re-calls `lamina content plan`. This is the
+       * ONLY status where re-calling plan is the correct response.
+       *
+       * Use when: optional/preset customization choices (mood-board defaults
+       * vs user's own references), ambiguous routing (two apps fit), missing
+       * strategic context (platform, scope, variant count).
+       */
+      clarifications: ContentPlanClarificationItem[];
+    }
+  | {
       status: 'unmatched';
       /** Plain-language reason no app or recipe could be drafted. */
       reason: string;
       /** Validator / agent errors (rare). */
       errors?: string[];
     };
+
+export interface ContentPlanClarificationItem {
+  /** One natural-language question. */
+  question: string;
+}
 
 // ─── POST /v1/content/auto-generate ──────────────────────────────────────────
 
@@ -957,7 +1005,26 @@ export interface FormFieldMedia extends FormFieldBase {
   kind: 'image' | 'video' | 'audio';
 }
 
-export type FormField = FormFieldText | FormFieldSelect | FormFieldMedia;
+/**
+ * Multi-select checkbox group. Used today for app output selection: when the
+ * agent emits `ask_user_for: [{name: "__outputs", question: "..."}]`, the
+ * server returns this widget with the app's output labels as options. The
+ * user's selection is sent back as `RunConfirmedAppParams.outputs[]`, NOT
+ * merged into `inputs`. See `dispatchPreview` in the plugin.
+ */
+export interface FormFieldMultiSelect extends FormFieldBase {
+  kind: 'multiSelect';
+  options: string[];
+  /** Hard cap on how many items the user can select. Maps to the dialog's
+   *  numVariants for output selection. */
+  max?: number;
+}
+
+export type FormField =
+  | FormFieldText
+  | FormFieldSelect
+  | FormFieldMedia
+  | FormFieldMultiSelect;
 
 /**
  * A note from the agent about a user-supplied dialog setting (aspectRatio,
@@ -1035,6 +1102,11 @@ export interface RunConfirmedAppParams {
   inputs: Record<string, unknown>;
   rationale?: string;
   webhookUrl?: string;
+  /** Optional subset of the app's outputs to run, by label. Labels must come
+   *  verbatim from `outputs[].label` on the app's describe response. Multi-
+   *  match labels expand to all matching outputs server-side. Omit to run
+   *  every output the app declares (today's default behavior). */
+  outputs?: string[];
 }
 
 export interface RunConfirmedFreestyleParams {
@@ -1098,6 +1170,11 @@ export interface FeedbackResult {
   refinedNodes: RefinedNode[];
   outputs: ExecutionOutput[];
   errorMessage: string | null;
+}
+
+export interface RunCancelResult {
+  runId: string;
+  status: LaminaExecutionStatusState | 'cancelled' | string;
 }
 
 export interface ListRunsParams {
