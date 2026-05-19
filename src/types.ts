@@ -640,16 +640,70 @@ export interface LaminaCreateParams {
   metadata?: Record<string, unknown>;
 }
 
-export interface LaminaCreateResult {
-  runId: string | null;
-  workflowId: string;
-  workflowName: string;
-  status: string;
-  selectedApp: SelectedApp;
-  brandContext: BrandContextSummary | null;
-  guidanceSummary: GuidanceSummary | null;
-  needsInput?: NeedsInput;
-}
+/**
+ * Result of `POST /v1/content/create` — the autonomous sibling of
+ * `/v1/content/plan`. Same router agent and routing tree (apps + recipes,
+ * role classification, asks, clarifications) — `create` additionally
+ * auto-dispatches when the brief has enough context to commit safely.
+ *
+ * Status union:
+ *   - `'ran'`                 — the run is queued; act on `runId` via `client.runs.wait`
+ *   - `'needs_input'`         — plan ready, but specific slots need user values;
+ *                               resolve via `client.runs.run(appId, {...})` directly.
+ *                               DO NOT re-call `create` (would re-roll the router LLM).
+ *   - `'needs_clarification'` — brief itself is ambiguous (preset/scope/etc.);
+ *                               refine the brief and re-call `create` (only path
+ *                               where re-calling is correct).
+ *   - `'unmatched'`           — no app/recipe fits the brief.
+ */
+export type LaminaCreateResult =
+  | {
+      status: 'ran';
+      mode: 'app';
+      runId: string;
+      selectedApp: ContentPlanSelectedAppRef;
+      draftedInputs: Record<string, unknown>;
+      warnings: ContentPlanWarning[];
+    }
+  | {
+      status: 'ran';
+      mode: 'recipe';
+      runId: string;
+      recipe: ContentPlanRecipe;
+      modality: 'image' | 'video';
+      picks: string | null;
+      numVariants: number;
+      submittedCount: number;
+      failedCount: number;
+      warnings: ContentPlanWarning[];
+    }
+  | {
+      status: 'needs_input';
+      mode: 'app';
+      selectedApp: ContentPlanSelectedAppRef;
+      draftedInputs: Record<string, unknown>;
+      askUser: ContentPlanAskUserItem[];
+      warnings: ContentPlanWarning[];
+      /** Optional output-label subset the agent picked from the brief. */
+      selectedOutputs?: string[];
+    }
+  | {
+      status: 'needs_input';
+      mode: 'recipe';
+      recipe: ContentPlanRecipe;
+      modality: 'image' | 'video';
+      askUser: ContentPlanAskUserItem[];
+      warnings: ContentPlanWarning[];
+    }
+  | {
+      status: 'needs_clarification';
+      clarifications: ContentPlanClarificationItem[];
+    }
+  | {
+      status: 'unmatched';
+      reason: string;
+      errors?: string[];
+    };
 
 export interface ScoreContentParams {
   contentItemIds?: string[];
