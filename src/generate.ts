@@ -41,7 +41,6 @@ export interface LaminaGenerateImageResult {
   runId: string;
   status: 'queued' | 'completed';
   model: string;
-  mode: 'text-to-image' | 'image-to-image';
   /** Flat bag of every field the dispatch actually sent, including `prompt` when supplied. */
   resolvedParams: Record<string, unknown>;
 }
@@ -65,13 +64,6 @@ export interface LaminaGenerateVideoResult {
   runId: string;
   status: 'queued' | 'completed';
   model: string;
-  mode:
-    | 'text-to-video'
-    | 'image-to-video'
-    | 'video-to-video'
-    | 'motion-control'
-    | 'reference-to-video'
-    | 'video-reference';
   /** Flat bag of every field the dispatch actually sent, including `prompt` when supplied. */
   resolvedParams: Record<string, unknown>;
 }
@@ -84,16 +76,6 @@ export interface LaminaAtomicRunStatus {
   runId: string;
   status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
   model: string | null;
-  mode:
-    | 'text-to-image'
-    | 'image-to-image'
-    | 'text-to-video'
-    | 'image-to-video'
-    | 'video-to-video'
-    | 'motion-control'
-    | 'reference-to-video'
-    | 'video-reference'
-    | null;
   /** Flat bag of every field the dispatch sent, including `prompt` when supplied. */
   resolvedParams: Record<string, unknown>;
   output: { type: 'image' | 'video'; url: string | null } | null;
