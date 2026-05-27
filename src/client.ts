@@ -7,7 +7,9 @@ import { resolveClientOptions } from './config.js';
 import { createLaminaError } from './errors.js';
 import { createExecutionsApi } from './executions.js';
 import { createFreestyleApi } from './freestyle.js';
+import { createGenerateApi } from './generate.js';
 import { createIntelligenceApi } from './intelligence.js';
+import { createModelsApi } from './models.js';
 import { createPublishingApi } from './publishing.js';
 // NOTE: `./storage.js` is intentionally NOT imported at module load time —
 // it depends on Node-only modules (`node:fs/promises`, `node:os`, `node:path`)
@@ -61,7 +63,16 @@ export class LaminaClient {
   /** @deprecated Use `.runs` instead */
   readonly executions: ReturnType<typeof createExecutionsApi>;
   readonly freestyle: ReturnType<typeof createFreestyleApi>;
+  /**
+   * Atomic model-pinned dispatch — `.image(...)` and `.video(...)`. The
+   * model id is the discriminator: image-to-image, motion-control, video-
+   * to-video, etc. are all just models that take their own params (per
+   * the model's `paramSchema`, fetched via `.models.describe`).
+   */
+  readonly generate: ReturnType<typeof createGenerateApi>;
   readonly intelligence: ReturnType<typeof createIntelligenceApi>;
+  /** Atomic model discovery — list + describe available models. */
+  readonly models: ReturnType<typeof createModelsApi>;
   readonly publishing: ReturnType<typeof createPublishingApi>;
   readonly webhooks: ReturnType<typeof createWebhooksApi>;
 
@@ -81,7 +92,9 @@ export class LaminaClient {
     this.runs = createExecutionsApi(request);
     this.executions = this.runs; // backward compat
     this.freestyle = createFreestyleApi(request);
+    this.generate = createGenerateApi(request);
     this.intelligence = createIntelligenceApi(request);
+    this.models = createModelsApi(request);
     this.publishing = createPublishingApi(request);
     this.webhooks = createWebhooksApi(request);
   }

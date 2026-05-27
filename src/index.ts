@@ -18,7 +18,24 @@ export { createContentApi } from './content.js';
 /** @deprecated Use `createContentApi` instead */
 export { createContentApi as createCompoundApi } from './content.js';
 export { createFreestyleApi } from './freestyle.js';
+export { createGenerateApi } from './generate.js';
+export type {
+  LaminaAtomicRunStatus,
+  LaminaGenerateImageRequest,
+  LaminaGenerateImageResult,
+  LaminaGenerateVideoRequest,
+  LaminaGenerateVideoResult,
+  LaminaImageRunStatus,
+} from './generate.js';
 export { createIntelligenceApi } from './intelligence.js';
+export { createModelsApi } from './models.js';
+export type {
+  LaminaModelSummary,
+  LaminaModelDescribe,
+  LaminaModelDescribeOptions,
+  LaminaModelParamSchemaField,
+  LaminaModelsListOptions,
+} from './models.js';
 export { createPublishingApi } from './publishing.js';
 export { LaminaWebhookListener } from './webhookListener.js';
 // Storage helpers are CLI/server-only — they import `node:fs/promises`,
